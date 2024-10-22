@@ -16,6 +16,20 @@ class SystolicUnit:
     c: int = 0
 
 
+def shift_inputs_for_matmul(A: np.ndarray, B: np.ndarray):
+    N = A.shape[0]
+    assert A.shape == B.shape == (N, N)
+
+    padded_A = np.pad(A, ((0, 0), (2 * N - 2, N - 1)))
+    padded_B = np.pad(B, ((2 * N - 2, N - 1), (0, 0)))
+
+    for i in reversed(range(3 * N - 2)):
+        yield (
+            np.diagonal(padded_A, offset=i),
+            np.diagonal(padded_B, offset=-i),
+        )
+
+
 class SystolicArray:
     def __init__(self, N: int):
         assert N > 1
@@ -49,22 +63,8 @@ class SystolicArray:
 
     def matmul(self, A: np.ndarray, B: np.ndarray) -> np.ndarray:
         assert A.shape == B.shape == (self.N, self.N)
-
-        for i in range(self.N - 1, -self.N, -1):
-            if i >= 0:
-                self.update_inputs(
-                    np.pad(np.diagonal(A, offset=i), (0, i)),
-                    np.pad(np.diagonal(B, offset=-i), (0, i)),
-                )
-            else:
-                self.update_inputs(
-                    np.pad(np.diagonal(A, offset=i), (-i, 0)),
-                    np.pad(np.diagonal(B, offset=-i), (-i, 0)),
-                )
-            self.run_cells()
-
-        for i in range(self.N - 1):
-            self.update_inputs(np.zeros(self.N, dtype=int), np.zeros(self.N, dtype=int))
+        for a, b in shift_inputs_for_matmul(A, B):
+            self.update_inputs(a, b)
             self.run_cells()
 
         return self.vals()
@@ -78,10 +78,12 @@ class SystolicArray:
 
 # Example usage
 if __name__ == "__main__":
-    A = np.random.randint(-10, 10, (10, 10))
-    B = np.random.randint(-10, 10, (10, 10))
+    N = 10
 
-    systolic_array = SystolicArray(N=10)
+    A = np.random.randint(-10, 10, (N, N))
+    B = np.random.randint(-10, 10, (N, N))
+
+    systolic_array = SystolicArray(N=N)
     result = systolic_array.matmul(A, B)
 
     print("Matrix A:")
