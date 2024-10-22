@@ -17,27 +17,29 @@ class SystolicUnit:
 
 
 class SystolicArray:
-    def __init__(self):
-        self.array = [[SystolicUnit() for _ in range(4)] for _ in range(4)]
+    def __init__(self, N: int):
+        assert N > 1
+        self.array = [[SystolicUnit() for _ in range(N)] for _ in range(N)]
+        self.N = N
 
         # "Wiring" the units together in a grid
-        for r, c in product(range(4), range(4)):
-            if c + 1 < 4:
+        for r, c in product(range(N), range(N)):
+            if c + 1 < N:
                 self.array[r][c].out_a = self.array[r][c + 1]
-            if r + 1 < 4:
+            if r + 1 < N:
                 self.array[r][c].out_b = self.array[r + 1][c]
 
     def update_inputs(self, aa: list[int], bb: list[int]):
         """Update inputs of leftmost/uppermost cells"""
-        for r in range(4):
+        for r in range(self.N):
             self.array[r][0].a = aa[r]
-        for c in range(4):
+        for c in range(self.N):
             self.array[0][c].b = bb[c]
 
     def run_cells(self):
         # Running in this exact order (large to small r and c) is important
         # so values aren't moved multiple times in one cycle
-        for r, c in product(reversed(range(4)), reversed(range(4))):
+        for r, c in product(reversed(range(self.N)), reversed(range(self.N))):
             cell = self.array[r][c]
             cell.c += cell.a * cell.b
             if cell.out_a:
@@ -46,9 +48,9 @@ class SystolicArray:
                 cell.out_b.b = cell.b
 
     def matmul(self, A: np.ndarray, B: np.ndarray) -> np.ndarray:
-        assert A.shape == B.shape == (4, 4)
+        assert A.shape == B.shape == (self.N, self.N)
 
-        for i in range(3, -4, -1):
+        for i in range(self.N - 1, -self.N, -1):
             if i >= 0:
                 self.update_inputs(
                     np.pad(np.diagonal(A, offset=i), (0, i)),
@@ -61,25 +63,25 @@ class SystolicArray:
                 )
             self.run_cells()
 
-        for i in range(3):
-            self.update_inputs(np.zeros(4), np.zeros(4))
+        for i in range(self.N - 1):
+            self.update_inputs(np.zeros(self.N, dtype=int), np.zeros(self.N, dtype=int))
             self.run_cells()
 
         return self.vals()
 
     def vals(self):
-        ret = np.zeros((4, 4), dtype=int)
-        for r, c in product(range(4), range(4)):
+        ret = np.zeros((self.N, self.N), dtype=int)
+        for r, c in product(range(self.N), range(self.N)):
             ret[r, c] = self.array[r][c].c
         return ret
 
 
 # Example usage
 if __name__ == "__main__":
-    A = np.random.randint(0, 10, (4, 4))
-    B = np.random.randint(0, 10, (4, 4))
+    A = np.random.randint(-10, 10, (10, 10))
+    B = np.random.randint(-10, 10, (10, 10))
 
-    systolic_array = SystolicArray()
+    systolic_array = SystolicArray(N=10)
     result = systolic_array.matmul(A, B)
 
     print("Matrix A:")
